@@ -1,3 +1,2 @@
-persona-simulator/
-├── app.py            ✅ the Streamlit UI
-└── requirements.txt  ✅ just streamlit + requests
+streamlit
+requests
