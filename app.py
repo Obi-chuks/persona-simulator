@@ -130,4 +130,11 @@ else:
     # Chat History
     for m in st.session_state.messages:
         if m["role"] == "user":
-            st.markdown(f'<div class="speaker-label" style="text-align:right;">USER</div><div class="user-msg">{m["content"]}</div>', unsafe_allow_html=True
+            st.markdown(f'<div class="speaker-label" style="text-align:right;">USER</div><div class="user-msg">{m["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="speaker-label">{p["name"].upper()}</div><div class="persona-msg">{m["content"]}{eval_badge(m.get("evaluation"))}</div>', unsafe_allow_html=True)
+
+    # Chat Input
+    query = st.chat_input(f"Ask {p['name']} a question...")
+    if query:
+        send_message(query, p)
