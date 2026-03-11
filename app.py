@@ -56,4 +56,77 @@ section[data-testid="stSidebar"] { background: #0c101a !important; border-right:
 """, unsafe_allow_html=True)
 
 # --- SESSION STATE ---
-if "messages" not in st
+if "messages" not in st.session_state: st.session_state.messages = []
+if "persona_active" not in st.session_state: st.session_state.persona_active = False
+
+# --- CORE FUNCTIONS ---
+def call_azure(question):
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {AZURE_KEY}"}
+    # Payload key 'source_context' must match your Prompt Flow input node name!
+    payload = {"source_context": question} 
+    
+    response = requests.post(AZURE_ENDPOINT, headers=headers, json=payload, timeout=40)
+    
+    if response.status_code != 200:
+        st.error(f"Azure Inference Error ({response.status_code}): {response.text}")
+        return {"Answer": "My cognitive engine is experiencing a connection delay.", "Evaluator": "Low Confidence"}
+    
+    return response.json()
+
+def eval_badge(evaluation):
+    if not evaluation: return ""
+    return f'<div class="eval-badge">🛡️ INTEGRITY AUDIT: {evaluation}</div>'
+
+def completeness_bar(field, pct, real):
+    color = "#00c896" if real else "#f5a623"
+    return f'<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;"><span style="color:#6a8a7a;font-size:10px;">{field}</span><span style="color:{color};font-size:10px;">{pct}%</span></div><div style="height:3px;background:#1a2a2a;"><div style="height:100%;width:{pct}%;background:{color};"></div></div></div>'
+
+def send_message(question, p):
+    st.session_state.messages.append({"role":"user","content":question})
+    with st.spinner(f"{p['name']} is reflecting on the Bordeaux market..."):
+        data = call_azure(question)
+        # Case-sensitive mapping from your Prompt Flow Outputs
+        ans = data.get("Answer", "I am unable to process that context.")
+        evl = data.get("Evaluator", "Pending Audit")
+        st.session_state.messages.append({"role":"persona","content":ans,"evaluation":evl})
+    st.rerun()
+
+# --- SIDEBAR UI ---
+with st.sidebar:
+    st.markdown("### ● BNPP · PERSONA SIMULATOR")
+    st.markdown("---")
+    choice = st.selectbox("Select Persona", list(PRESET_PERSONAS.keys()))
+    persona = PRESET_PERSONAS[choice]
+    
+    if persona:
+        st.markdown(f"**Target:** {persona['name']}")
+        if st.button("▶ Start Interview"):
+            st.session_state.persona = persona
+            st.session_state.persona_active = True
+            st.session_state.messages = [{"role":"persona","content":f"Hello, I am {persona['name']}. Ask me about banking in Bordeaux.", "evaluation":"Verified Preset"}]
+            st.rerun()
+
+# --- MAIN CHAT INTERFACE ---
+if not st.session_state.persona_active:
+    st.write("### ← Select a Persona to begin the simulation.")
+else:
+    p = st.session_state.persona
+    
+    # Header Info
+    c1, c2 = st.columns([1, 2])
+    with c1: st.metric("Income", p['income'])
+    with c2: st.write(f"**Role:** {p['role']} | **Location:** {p['location']}")
+    
+    st.markdown("---")
+    
+    # Chat History Render
+    for m in st.session_state.messages:
+        if m["role"] == "user":
+            st.markdown(f'<div class="speaker-label" style="text-align:right;">USER</div><div class="user-msg">{m["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="speaker-label">{p["name"].upper()}</div><div class="persona-msg">{m["content"]}{eval_badge(m.get("evaluation"))}</div>', unsafe_allow_html=True)
+
+    # Input Box
+    query = st.chat_input(f"Ask {p['name']} anything...")
+    if query:
+        send_message(query, p)
