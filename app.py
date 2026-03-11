@@ -60,16 +60,17 @@ if "messages" not in st.session_state: st.session_state.messages = []
 if "persona_active" not in st.session_state: st.session_state.persona_active = False
 if "persona" not in st.session_state: st.session_state.persona = {}
 
-# --- CORE FUNCTIONS ---
 def call_azure(question):
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {AZURE_KEY}"}
-    # FIXED: Key changed to "Question" to match your Azure Input exactly
     payload = {"Question": question} 
     
     response = requests.post(AZURE_ENDPOINT, headers=headers, json=payload, timeout=45)
     
     if response.status_code != 200:
-        return {"Answer": "My cognitive engine is experiencing a connection mismatch.", "Evaluator": "Audit Failure"}
+        # --- WE ARE ADDING THIS LINE TO REVEAL THE TRUTH ---
+        st.error(f"🚨 AZURE REJECTION [{response.status_code}]: {response.text}")
+        
+        return {"Answer": "Error revealed above.", "Evaluator": "Audit Failure"}
     
     return response.json()
 
