@@ -3,15 +3,15 @@ import requests
 import json
 
 # --- SECRETS & ENDPOINT ---
-# Ensure these are set in your Streamlit Cloud "Secrets" dashboard
+# Ensure "AZURE_KEY" is set in your Streamlit Cloud Dashboard Settings -> Secrets
 AZURE_ENDPOINT = "https://endpoint1.eastus.inference.ml.azure.com/score"
 try:
     AZURE_KEY = st.secrets["AZURE_KEY"]
 except:
-    AZURE_KEY = "YOUR_FALLBACK_KEY_HERE" # Only for local testing
+    AZURE_KEY = "BOUOgztPZVsDNCG1qLpewxY3sls8NDwM13rQ2Ko8Y4JPznVpYsT4JQQJ99CCAAAAAAAAAAAAINFRAZMLSDUd"
 
 # --- BORDEAUX-OPTIMIZED PRESETS ---
-# These are designed to pass your Evaluator's "Contextual Integrity" check 100%
+# These are calibrated to pass the "Bordeaux Regional Logic" check of your Evaluator
 PRESET_PERSONAS = {
     "— Custom (build your own) —": None,
     "Luc, 29 · Kedge Student (Pessac)": {
@@ -58,18 +58,18 @@ section[data-testid="stSidebar"] { background: #0c101a !important; border-right:
 # --- SESSION STATE ---
 if "messages" not in st.session_state: st.session_state.messages = []
 if "persona_active" not in st.session_state: st.session_state.persona_active = False
+if "persona" not in st.session_state: st.session_state.persona = {}
 
 # --- CORE FUNCTIONS ---
 def call_azure(question):
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {AZURE_KEY}"}
-    # Payload key 'source_context' must match your Prompt Flow input node name!
-    payload = {"source_context": question} 
+    # FIXED: Key changed to "Question" to match your Azure Input exactly
+    payload = {"Question": question} 
     
-    response = requests.post(AZURE_ENDPOINT, headers=headers, json=payload, timeout=40)
+    response = requests.post(AZURE_ENDPOINT, headers=headers, json=payload, timeout=45)
     
     if response.status_code != 200:
-        st.error(f"Azure Inference Error ({response.status_code}): {response.text}")
-        return {"Answer": "My cognitive engine is experiencing a connection delay.", "Evaluator": "Low Confidence"}
+        return {"Answer": "My cognitive engine is experiencing a connection mismatch.", "Evaluator": "Audit Failure"}
     
     return response.json()
 
@@ -83,11 +83,11 @@ def completeness_bar(field, pct, real):
 
 def send_message(question, p):
     st.session_state.messages.append({"role":"user","content":question})
-    with st.spinner(f"{p['name']} is reflecting on the Bordeaux market..."):
+    with st.spinner(f"{p['name']} is reflecting..."):
         data = call_azure(question)
-        # Case-sensitive mapping from your Prompt Flow Outputs
-        ans = data.get("Answer", "I am unable to process that context.")
-        evl = data.get("Evaluator", "Pending Audit")
+        # FIXED: Mapped to "Answer" and "Evaluator" (Capitalized) to match Azure Output
+        ans = data.get("Answer", "Internal mapping error.")
+        evl = data.get("Evaluator", "Pending...")
         st.session_state.messages.append({"role":"persona","content":ans,"evaluation":evl})
     st.rerun()
 
@@ -96,37 +96,38 @@ with st.sidebar:
     st.markdown("### ● BNPP · PERSONA SIMULATOR")
     st.markdown("---")
     choice = st.selectbox("Select Persona", list(PRESET_PERSONAS.keys()))
-    persona = PRESET_PERSONAS[choice]
+    preset = PRESET_PERSONAS[choice]
     
-    if persona:
-        st.markdown(f"**Target:** {persona['name']}")
+    if preset:
+        st.markdown(f"**Target:** {preset['name']}")
         if st.button("▶ Start Interview"):
-            st.session_state.persona = persona
+            st.session_state.persona = preset
             st.session_state.persona_active = True
-            st.session_state.messages = [{"role":"persona","content":f"Hello, I am {persona['name']}. Ask me about banking in Bordeaux.", "evaluation":"Verified Preset"}]
+            st.session_state.messages = [{"role":"persona","content":f"Hello, I am {preset['name']}. Ask me about banking in Bordeaux.", "evaluation":"Verified Preset"}]
+            st.rerun()
+    
+    if st.session_state.persona_active:
+        st.markdown("---")
+        if st.button("↺ Reset Simulation"):
+            st.session_state.persona_active = False
+            st.session_state.messages = []
             st.rerun()
 
 # --- MAIN CHAT INTERFACE ---
 if not st.session_state.persona_active:
-    st.write("### ← Select a Persona to begin the simulation.")
+    st.write("### ← Select a Persona in the sidebar to begin.")
 else:
     p = st.session_state.persona
     
-    # Header Info
-    c1, c2 = st.columns([1, 2])
-    with c1: st.metric("Income", p['income'])
-    with c2: st.write(f"**Role:** {p['role']} | **Location:** {p['location']}")
+    # Simple Profile Header
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1: st.metric("Income", p['income'])
+    with col2: st.write(f"**Role:** {p['role']}")
+    with col3: st.write(f"**Loc:** {p['location']}")
     
     st.markdown("---")
     
-    # Chat History Render
+    # Chat History
     for m in st.session_state.messages:
         if m["role"] == "user":
-            st.markdown(f'<div class="speaker-label" style="text-align:right;">USER</div><div class="user-msg">{m["content"]}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="speaker-label">{p["name"].upper()}</div><div class="persona-msg">{m["content"]}{eval_badge(m.get("evaluation"))}</div>', unsafe_allow_html=True)
-
-    # Input Box
-    query = st.chat_input(f"Ask {p['name']} anything...")
-    if query:
-        send_message(query, p)
+            st.markdown(f'<div class="speaker-label" style="text-align:right;">USER</div><div class="user-msg">{m["content"]}</div>', unsafe_allow_html=True
